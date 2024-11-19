@@ -1,0 +1,769 @@
+
+# Seurat Libraries used during analysis
+library(SingleR)
+library(celldex)
+library(pheatmap)
+library(Seurat)
+library(DESeq2)
+library(tidyverse)
+library(patchwork)
+library(ggplot2)
+library(ggpubr)
+library(magrittr)
+library(dplyr)
+library(plyr)
+library(EnhancedVolcano)
+library(ggrepel)
+library(Matrix)
+library(patchwork)
+library(gridExtra)
+library(EnsDb.Hsapiens.v86)
+library(ExperimentHub)
+library(R.utils)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(biomaRt)
+library(gridExtra)
+library(glmGamPoi)
+library(clusterProfiler)
+library(enrichplot)
+
+# Set the working directory 
+setwd("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/ALIVE")
+
+# Sample directories
+base_dir <- "C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/ALIVE"
+dirs <- list.dirs(path = base_dir, recursive = FALSE, full.names = TRUE)
+seurat_objects <- list()
+for (dir in dirs) {
+  # Extract sample name from directory name
+  sample_name <- basename(dir)
+
+  features_path <- file.path(dir, "modified_features.tsv")
+  barcodes_path <- file.path(dir, "modified_barcodes.tsv")
+  matrix_path <- file.path(dir, "matrix.mtx")
+
+  modified_features <- read.table(features_path, header = TRUE, sep = "\t")
+  modified_barcodes <- read.table(barcodes_path, header = TRUE, sep = "\t")
+  
+ # Debugging: Print dimensions and check for discrepancies
+  cat("Sample:", sample_name, "\n")
+  cat("Modified Features:\n")
+  print(head(modified_features))
+  cat("Modified Barcodes:\n")
+  print(head(modified_barcodes))
+  cat("\n")
+
+  matrix <- readMM(matrix_path)
+
+  matrix_sparse <- as(matrix, "dgCMatrix")
+ 
+  rownames(matrix_sparse) <- make.unique(modified_features$other_columns_if_any, sep = "_")
+  colnames(matrix_sparse) <- modified_barcodes$barcode
+
+  seurat_obj <- CreateSeuratObject(counts = matrix_sparse)
+ 
+  seurat_objects[[sample_name]] <- seurat_obj
+}
+
+
+
+# List of Seurat objects and their corresponding names for Severe Alive
+seurat_objects <- list(SA1, SA2, SA4, SA5, SA6, SA8, SA9, SA11, SA14, SA16, SA17, SA23, SA27)
+seurat_names <- c("SA1", "SA2", "SA4", "SA5", "SA6", "SA8", "SA9", "SA11", "SA14", "SA16", "SA17", "SA23", "SA27")
+
+# Rename cells to ensure unique names
+for (i in seq_along(seurat_objects)) {
+  seurat_objects[[i]] <- RenameCells(seurat_objects[[i]], add.cell.id = seurat_names[i])
+}
+
+for (obj in seurat_objects) {
+  print(head(colnames(obj)))
+}
+
+# Merge Severe Alive data sets
+Severe_Alive <- merge(x = seurat_objects[[1]], y = seurat_objects[-1])
+
+
+############################# SEVERE DEAD
+
+base_dir1 <- "C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/DEAD"
+
+dirs1 <- list.dirs(path = base_dir1, recursive = FALSE, full.names = TRUE)
+
+for (dir1 in dirs1) {
+  sample_name1 <- basename(dir1)
+
+  modified_features1 <- read.table(file.path(dir1, "modified_features.tsv"), header = TRUE, sep = "\t")
+  modified_barcodes1 <- read.table(file.path(dir1, "modified_barcodes.tsv"), header = TRUE, sep = "\t")
+ 
+  cat("Sample:", sample_name1, "\n")
+  cat("Modified Features:\n")
+  print(head(modified_features1))
+  cat("Modified Barcodes:\n")
+  print(head(modified_barcodes1))
+  cat("\n")
+}
+seurat_objects1 <- list()
+for (dir1 in dirs1) {
+    sample_name1 <- basename(dir1)
+  
+  
+  matrix_path1 <- file.path(dir1, "matrix.mtx")
+  matrix1 <- readMM(matrix_path1)
+  
+   features_path1 <- file.path(dir1, "modified_features.tsv")
+  barcodes_path1 <- file.path(dir1, "modified_barcodes.tsv")
+  
+  features1 <- read.table(features_path1, header = TRUE, sep = "\t")
+  barcodes1 <- read.table(barcodes_path1, header = TRUE, sep = "\t")
+  
+   matrix_sparse1 <- as(matrix1, "dgCMatrix")
+  
+    rownames(matrix_sparse1) <- make.unique(features1$other_columns_if_any, sep = "_")
+  colnames(matrix_sparse1) <- barcodes1$barcode  # Ensure correct assignment
+  
+  # Debugging: Print dimensions and check for discrepancies
+  cat("Matrix Dimensions:\n")
+  print(dim(matrix_sparse1))
+  cat("Number of Barcodes:\n")
+  print(length(barcodes1$barcode))
+  cat("\n")
+  
+  seurat_obj1 <- CreateSeuratObject(counts = matrix_sparse1)
+  
+  seurat_objects1[[sample_name1]] <- seurat_obj1
+}
+
+
+# List of Seurat objects and their corresponding names for Severe Dead
+
+seurat_objects1 <- list(SD3, SD7, SD10, SD18, SD22, SD24, SD25, SD29)
+seurat_names1 <- c("SD3", "SD7", "SD10", "SD18", "SD22", "SD24", "SD25", "SD29")
+
+for (i in seq_along(seurat_objects1)) {
+  seurat_objects1[[i]] <- RenameCells(seurat_objects1[[i]], add.cell.id = seurat_names1[i])
+}
+
+# Verify the renaming
+for (obj in seurat_objects1) {
+  print(head(colnames(obj)))
+}
+
+# Merge Seurat objects for Severe Dead
+Severe_Dead <- merge(x = seurat_objects1[[1]], y = seurat_objects1[-1])
+
+# Merge final Seurat objects for ALive and Dead individuals
+
+Severe_merged <- merge(Severe_Alive, Severe_Dead)
+
+
+setwd("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/Mild")
+
+M1<-Read10X_h5("GSM4339769_C141_filtered_feature_bc_matrix.h5")
+M1<-CreateSeuratObject(counts = M1)
+M2<-Read10X_h5("GSM4339770_C142_filtered_feature_bc_matrix.h5")
+M2<-CreateSeuratObject(counts = M2)
+M3<-Read10X_h5("GSM4339772_C144_filtered_feature_bc_matrix.h5")
+M3<-CreateSeuratObject(counts = M3)
+
+# Merge moderate 
+
+Moderate <- merge(M1, c(M2, M3))
+
+setwd("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control")
+
+C1<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593888_sample_1_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C1<-CreateSeuratObject(counts = C1)
+C2<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593889_sample_2_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C2<-CreateSeuratObject(counts = C2)
+C3<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593890_sample_3_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C3<-CreateSeuratObject(counts = C3)
+C4<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593891_sample_4_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C4<-CreateSeuratObject(counts = C4)
+C5<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593892_sample_5_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C5<-CreateSeuratObject(counts = C5)
+C6<-read.csv("C:/Users/User/Documents/PhD files/Results/Rstudio/Single cell 1/Patient DATA1/Control DATA 1/control/GSM4593893_sample_6_UMI_counts.csv",row.names = 1, stringsAsFactors = FALSE)
+C6<-CreateSeuratObject(counts = C6)
+
+# Merge control
+Controls <- merge(C1, c(C2, C3, C4, C5, C6))
+
+# Assign origins
+
+Controls$origin <- 'Control'
+Moderate$origin <- 'Moderate'
+Severe_Alive$origin <- 'SevereA'
+Severe_Dead$origin <- 'SevereD'
+
+# Merge all data sets from Controls and Moderate into a single Seurat object
+
+Study_one <- merge(Controls, Moderate)
+
+#Quality control and filtering for Study_one
+
+Study_one[["percent.mt"]] <- PercentageFeatureSet(Study_one, pattern = "^MT-")
+
+VlnPlot(Study_one, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+# Filtering 
+
+Study_one <- subset(Study_one, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & nCount_RNA < 40000 &
+                          percent.mt < 10)
+VlnPlot(Study_one, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+
+# Quality cotrol and filtering for study two
+
+Severe_merged[["percent.mt"]] <- PercentageFeatureSet(Severe_merged, pattern = "^MT-")
+
+VlnPlot(Severe_merged, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+# Filtering 
+
+Severe_merged <- subset(Severe_merged, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & nCount_RNA < 40000 &
+                     percent.mt < 10)
+VlnPlot(Severe_merged, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+
+### Merge both studies into a single object
+
+Combined <- merge(Study_one, Severe_merged)
+
+# Join Layer prior to integration
+
+Combined<- JoinLayers(Combined)
+Combined[["RNA"]] <- split(Combined[["RNA"]], f = Combined$origin)
+
+######################### normalization before to integration
+
+Combined <- NormalizeData(Combined, normalization.method = "LogNormalize")
+Combined <- FindVariableFeatures(Combined, selection.method = "vst", nfeatures = 2000)
+Combined <- ScaleData(Combined, verbose = FALSE, vars.to.regress = c("nCount_RNA", "percent.mt"))
+Combined <- RunPCA(Combined)
+Combined <- FindNeighbors(Combined)
+Combined <- FindClusters(Combined, resolution = 0.8, cluster.name = "unintegrated_clusters")
+Combined <- RunUMAP(Combined, dims = 1:20)
+p1 <- DimPlot(Combined, label= TRUE, group.by = "origin") + ggtitle("unintegrated")
+
+
+# Anchor-based CCA (Canonical correlation analysis) integration (method=CCAIntegration)
+
+Combined <- IntegrateLayers(object = Combined, method = CCAIntegration,
+                       orig.reduction = "pca", new.reduction = "integrated.cca",
+                       verbose = FALSE)
+Combined <- FindNeighbors(Combined, reduction = "integrated.cca", dims = 1:20)
+Combined <- FindClusters(Combined, resolution = 1.2, cluster.name = "cca_clusters")
+Combined <- RunUMAP(Combined, reduction = "integrated.cca", dims = 1:20, reduction.name = "umap.cca")
+p2 <- DimPlot(Combined, reduction = "umap.cca", label= TRUE, group.by = "origin") + ggtitle("cca_integrated")
+p1 + p2
+
+# get reference data for automatic annotation
+
+ref <- celldex::HumanPrimaryCellAtlasData()
+View(as.data.frame(colData(ref)))
+
+
+# Annotation diagnostics 
+pred <- SingleR(test = Combined_counts,
+                ref = ref,
+                labels = ref$label.main)
+
+Combined$singleR.labels<- pred$labels[match(rownames(Combined@meta.data), rownames(pred))]
+
+
+############ subset 
+Combined$newcell <- ifelse(Combined$singleR.labels =='Macrophage' | Combined$singleR.labels =='Monocyte', 'Mono/Mac', Combined$singleR.labels)
+
+Idents(Combined) <- Combined$singleR.labels
+
+Subset_cells <- subset(x = Combined, idents = c("Neutrophils", "T_cells", "Macrophage", "DC", "NK_cell", "Monocyte"))
+
+Subset_cells<- NormalizeData(Subset_cells, normalization.method = "LogNormalize")
+Subset_cells<- FindVariableFeatures(Subset_cells)
+Subset_cells <- ScaleData(Subset_cells)
+Subset_cells <- RunPCA(Subset_cells, verbose = FALSE)
+Subset_cells <- FindNeighbors(Subset_cells, dims = 1:20)
+Subset_cells<- FindClusters(Subset_cells, resolution = 0.3, verbose = FALSE)
+Subset_cells <- RunUMAP(Subset_cells, dims = 1:20)
+
+DimPlot(Subset_cells, reduction = 'umap', label = F, group.by = 'newcell') + 
+  ggtitle("Mono/Mac, Neutrophils, NK_cells, and T_cells") + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+###### Confirm cell clusters with identity markers
+
+FeaturePlot(Subset_cells, features = c("CD68", "CD14", "CD3D", "NCAM1", "FCGR3B"),
+                                        split.by = "origin", cols = c('lightgrey', 'red'))
+
+###### Subset NK cells 
+
+
+Idents(Subset_cells) <- Subset_cells$newcell
+
+Subset_cellsNK <- subset(x = Subset_cells, idents = c("NK_cell"))
+
+Subset_cellsNK<- NormalizeData(Subset_cellsNK, normalization.method = "LogNormalize")
+Subset_cellsNK<- FindVariableFeatures(Subset_cellsNK)
+Subset_cellsNK <- ScaleData(Subset_cellsNK)
+Subset_cellsNK <- RunPCA(Subset_cellsNK, verbose = FALSE)
+Subset_cellsNK <- FindNeighbors(Subset_cellsNK, dims = 1:5)
+Subset_cellsNK <- FindClusters(Subset_cellsNK, resolution = 0.004, verbose = TRUE)
+Subset_cellsNK <- RunUMAP(Subset_cellsNK, dims = 1:5)
+
+DimPlot(Subset_cellsNK, label = F, group.by = "origin", cols = my_colors) +
+  theme(text = element_text(size = 20)) +
+  theme(legend.position = "none") +  
+  theme(plot.title = element_text(hjust = 0.5)) +  
+  guides(color = guide_legend(override.aes = list(size = 10))) +  
+  labs(title = NULL)
+
+FeaturePlot(Subset_cellsNK, features = c("NCAM1"), split.by = 'origin', cols = c('lightgrey', 'red'))
+
+
+################## T cells
+
+Idents(Subset_cells) <- Subset_cells$newcell
+
+Subset_cellsT <- subset(x = Subset_cells, idents = c("T_cells"))
+
+Subset_cellsT<- NormalizeData(Subset_cellsT, normalization.method = "LogNormalize")
+Subset_cellsT<- FindVariableFeatures(Subset_cellsT)
+Subset_cellsT <- ScaleData(Subset_cellsT)
+Subset_cellsT <- RunPCA(Subset_cellsT, verbose = FALSE)
+ElbowPlot(Subset_cellsT, ndims = 20)
+Subset_cellsT <- FindNeighbors(Subset_cellsT, dims = 1:5)
+Subset_cellsT<- FindClusters(Subset_cellsT, resolution = 0.01, verbose = TRUE)
+Subset_cellsT <- RunUMAP(Subset_cellsT, dims = 1:5)
+
+my_colors <- c("Control" = "blue", 
+                  "Moderate" = "#32CD32",  
+                  "SevereA" = "red",   
+                  "SevereD" = "purple")
+
+# Assuming Subset_cellsMn is a Seurat object
+DimPlot(CD8_Tcells, label = F, group.by = "origin", cols = my_colors) +
+  theme(text = element_text(size = 20)) +
+  theme(legend.position = "right") +  
+  theme(plot.title = element_text(hjust = 0.5)) +  
+  guides(color = guide_legend(override.aes = list(size = 5))) +  
+  labs(title = NULL)
+
+FeaturePlot(Subset_cellsT, features = c("CD3D"), split.by = 'origin', cols = c('lightgrey', 'red'))
+
+
+############# Isolating CD8 expressing T cells
+
+CD8_Tcells = subset(Subset_cellsT,subset = CD8A > 0 & CD8B > 0, slot = 'counts')
+
+####### Perform normalization/dimen_reduction procedures
+
+CD8_Tcells<- NormalizeData(CD8_Tcells, normalization.method = "LogNormalize")
+CD8_Tcells<- FindVariableFeatures(CD8_Tcells)
+CD8_Tcells <- ScaleData(CD8_Tcells)
+CD8_Tcells <- RunPCA(CD8_Tcells, verbose = FALSE)
+CD8_Tcells <- FindNeighbors(CD8_Tcells, dims = 1:5)
+CD8_Tcells<- FindClusters(CD8_Tcells, resolution = 0.0001, verbose = TRUE)
+CD8_Tcells <- RunUMAP(CD8_Tcells, dims = 1:5)
+
+DimPlot(CD8_Tcells, label = F)
+DimPlot(CD8_Tcells, reduction = 'umap', label = F)+
+  theme(
+    legend.position = "none",  # Adjust legend position as needed
+    axis.title.x = element_text(size = 25),  
+    axis.title.y = element_text(size = 25),  
+    axis.text.x = element_text(size = 20),   
+    axis.text.y = element_text(size = 20) )
+
+
+
+### Violin plots for CD8_T cells
+
+VlnPlot(CD8_Tcells, features = c("GZMB"), group.by = "origin", pt.size = 0) +
+  scale_fill_manual(values = c("Control" = "blue", "Moderate" = "green", "SevereA" = "red", "SevereD" = "violet")) +
+  theme(
+    legend.position = "none",              
+    axis.title.x = element_blank(),         
+    axis.text.x = element_text(size = 20, angle = 0),  
+    axis.title.y = element_text(size = 20), 
+    axis.text.y = element_text(size = 20)   
+  )
+
+
+
+############### Subset Mono/Mac
+
+Idents(Subset_cells) <- Subset_cells$newcell
+
+Subset_cellsMn <- subset(x = Subset_cells, idents = "Mono/Mac" )
+Subset_cellsMn<- NormalizeData(Subset_cellsMn, normalization.method = "LogNormalize")
+Subset_cellsMn<- FindVariableFeatures(Subset_cellsMn)
+Subset_cellsMn <- ScaleData(Subset_cellsMn)
+Subset_cellsMn <- RunPCA(Subset_cellsMn, verbose = FALSE)
+ElbowPlot(Subset_cellsMn, ndims = 20)
+Subset_cellsMn <- FindNeighbors(Subset_cellsMn, dims = 1:10)
+Subset_cellsMn<- FindClusters(Subset_cellsMn, resolution = 0.1, verbose = TRUE)
+Subset_cellsMn <- RunUMAP(Subset_cellsMn, dims = 1:10)
+
+DimPlot(Subset_cellsMn, label = F, group.by = "origin", cols = my_colors) +
+  theme(text = element_text(size = 20)) +
+  theme(legend.position = "none") +  
+  theme(plot.title = element_text(hjust = 0.5)) +  
+  guides(color = guide_legend(override.aes = list(size = 10))) +  
+  labs(title = NULL)
+
+
+############ Renaming clusters with Groups
+
+library(plyr)
+current_cluster_ids <- Idents(Subset_cellsMn)
+levels(current_cluster_ids)
+
+# Define the new cluster names
+new_cluster_ids <- c("Group 1", "Group 2", "Group 3")
+current_cluster_ids <- Idents(Subset_cellsMn)
+cluster_mapping <- setNames(new_cluster_ids, c(0, 1, 2))
+Subset_cellsMn[["Groups"]] <- as.character(current_cluster_ids)
+Idents(Subset_cellsMn) <- plyr::mapvalues(current_cluster_ids, from = names(cluster_mapping), to = cluster_mapping)
+
+Subset_cellsMn$Groups <- ifelse(Subset_cellsMn$seurat_clusters == '0', 'Group 1',
+                                ifelse(Subset_cellsMn$seurat_clusters == '1', 'Group 3',
+                                       ifelse(Subset_cellsMn$seurat_clusters == '2', 'Group 2', NA)))
+
+ 
+DimPlot(Subset_cellsMn, label = FALSE, group.by= "Groups") +
+  theme(axis.text = element_text(size = 10)) +  
+  theme(axis.title = element_text(size = 20)) +  
+  theme(legend.position = "right", legend.margin = margin(5, 5, -70, -60))  
+
+
+######### Subset Neutrophils
+
+Idents(Subset_cells) <- Subset_cells$newcell
+
+Subset_cellsN <- subset(x = Subset_cells, idents = "Neutrophils" )
+Subset_cellsN<- NormalizeData(Subset_cellsN, normalization.method = "LogNormalize")
+Subset_cellsN<- FindVariableFeatures(Subset_cellsN)
+Subset_cellsN <- ScaleData(Subset_cellsN)
+Subset_cellsN <- RunPCA(Subset_cellsN, verbose = FALSE)
+ElbowPlot(Subset_cellsN, ndims = 20)
+Subset_cellsN <- FindNeighbors(Subset_cellsN, dims = 1:20)
+Subset_cellsN<- FindClusters(Subset_cellsN, resolution = 0.09, verbose = TRUE)
+Subset_cellsN <- RunUMAP(Subset_cellsN, dims = 1:20)
+
+DimPlot(Subset_cellsN, reduction = "umap", group.by = "origin", label = T, pt.size = 0.6) +
+  theme(legend.position = "right", legend.margin = margin(5, 5, -50, 20)) +  
+  theme(axis.text = element_text(size = 10)) +  =
+  theme(axis.title = element_text(size = 20)) +  
+  labs(title = NULL)  # Remove title
+
+
+cluster1.markers <- FindMarkers(Subset_cellsN, ident.1 = 1, min.pct = 0.5,
+                                assay = "RNA", only.pos = TRUE, logfc.threshold = 0.25)
+
+cluster2.markers <- FindMarkers(Subset_cellsN, ident.1 = 2, min.pct = 0.5,
+                                assay = "RNA", only.pos = TRUE, logfc.threshold = 0.25)
+
+cluster3.markers <- FindMarkers(Subset_cellsN, ident.1 = 3, min.pct = 0.5,
+                                assay = "RNA", only.pos = TRUE, logfc.threshold = 0.25)
+
+
+### Violin plots
+
+VlnPlot(Subset_cellsN, features = c("IL1B"), group.by = "origin", pt.size = 0) +
+  scale_fill_manual(values = c("Control" = "blue", "Moderate" = "green", "SevereA" = "red", "SevereD" = "violet")) +
+  theme(
+    legend.position = "none",              
+    axis.title.x = element_blank(),         
+    axis.text.x = element_text(size = 20, angle = 0),  
+    axis.title.y = element_text(size = 20), 
+    axis.text.y = element_text(size = 20)   
+  )
+
+########## Subset DCs
+
+Idents(Subset_cells) <- Subset_cells$newcell
+
+Subset_cellsDC <- subset(x = Subset_cells, idents = c("DC"))
+
+Subset_cellsDC<- NormalizeData(Subset_cellsDC, normalization.method = "LogNormalize")
+Subset_cellsDC<- FindVariableFeatures(Subset_cellsDC)
+Subset_cellsDC <- ScaleData(Subset_cellsDC)
+Subset_cellsDC <- RunPCA(Subset_cellsDC, verbose = FALSE)
+Subset_cellsDC <- FindNeighbors(Subset_cellsDC, dims = 1:5)
+Subset_cellsDC<- FindClusters(Subset_cellsDC, resolution = 0.001, verbose = TRUE)
+Subset_cellsDC <- RunUMAP(Subset_cellsDC, dims = 1:5)
+
+DimPlot(Subset_cellsDC, label = F)
+# Assuming Subset_cellsMn is a Seurat object
+DimPlot(Subset_cellsDC, label = F, group.by = "origin") +
+  theme(text = element_text(size = 20)) +
+  theme(legend.position = "right") +  
+  theme(plot.title = element_text(hjust = 0.5)) +  
+  guides(color = guide_legend(override.aes = list(size = 5))) +  
+  labs(title = NULL)
+
+
+
+
+#### Statistics for the different cell populations
+
+###### Proportion of Mono/Mac
+
+tubo_bar_Stat<-Subset_cells@meta.data %>% group_by(individual_id,origin, newcell) %>%
+  tally() %>% mutate(cell_percentage= n*100/sum(n)) 
+head(tubo_bar_Stat)
+
+ggplot(tubo_bar_Stat, aes(newcell, cell_percentage, fill = newcell)) + geom_boxplot()
+
+my_comp <- list(c('Moderate', 'Control'),
+                c('Moderate', 'SevereA'),
+                c('SevereA', 'Control'),
+                c('SevereD', 'Control'),
+                c('Moderate', 'SevereD'),
+                c('SevereA', 'SevereD'))
+Mono_Mac <- dplyr::filter(tubo_bar_Stat, newcell == 'Mono/Mac')
+ggplot(Mono_Mac, aes(origin, cell_percentage, fill = origin)) + geom_boxplot(width = 0.2)+
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = T) +
+  stat_compare_means(label.y = 126) + theme_bw()
+
+
+###### Boxplot
+
+ggplot(Mono_Mac, aes(origin, cell_percentage, fill = origin)) + 
+  geom_boxplot(width = 0.2) +
+  geom_jitter(position = position_jitterdodge(0.1), alpha = 0.6, size = 3, color = "black") +  
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = function(p) {
+                if (p < 0.001) "***"
+                else if (p < 0.01) "**"
+                else if (p < 0.05) "*"
+                else "ns"
+              }, test.args = list(exact = FALSE)) +
+  stat_compare_means(label = "p.format", label.y = c(140, 140, 154), vjust = -0.1) + 
+  theme_bw() +
+  labs(title = "Mono/Mac distribution", 
+       x = "Conditions", 
+       y = "Cell Percentage") +
+  theme(axis.text = element_text(size = 14),    
+        axis.title = element_text(size = 16),    
+        plot.title = element_text(size = 18),   
+        legend.position = "none",               
+        panel.grid.major = element_blank(),     
+        panel.grid.minor = element_blank())     
+
+
+###### Proportion of Neutrophils
+
+tubo_bar_Stat<-Subset_cells@meta.data %>% group_by(individual_id,origin, newcell) %>%
+  tally() %>% mutate(cell_percentage= n*100/sum(n)) 
+head(tubo_bar_Stat)
+
+ggplot(tubo_bar_Stat, aes(newcell, cell_percentage, fill = newcell)) + geom_boxplot()
+
+Neutroph <- dplyr::filter(tubo_bar_Stat, newcell == 'Neutrophils')
+ggplot(Neutroph, aes(origin, cell_percentage, fill = origin)) + geom_boxplot()+
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = T) +
+  stat_compare_means(label.y = 100) + theme_bw()
+
+###### Boxplot
+
+ggplot(Neutroph, aes(origin, cell_percentage, fill = origin)) + 
+  geom_boxplot(width = 0.2) +
+  geom_jitter(position = position_jitterdodge(0.1), alpha = 0.6, size = 3, color = "black") +  
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = function(p) {
+                if (p < 0.001) "***"
+                else if (p < 0.01) "**"
+                else if (p < 0.05) "*"
+                else "ns"
+              }) +
+  stat_compare_means(label = "p.format", label.y = c(140, 140, 154), vjust = -0.1) + 
+  theme_bw() +
+  labs(title = "Neutrophils distribution", 
+       x = "Conditions", 
+       y = "Cell Percentage") +
+  theme(axis.text = element_text(size = 14),     
+        axis.title = element_text(size = 16),    
+        plot.title = element_text(size = 18),    
+        legend.position = "none",               
+        panel.grid.major = element_blank(),     
+        panel.grid.minor = element_blank())     
+
+
+###### Calculate cell percentages for T_Cells
+
+tubo_bar_Stat<-Subset_cells@meta.data %>% group_by(individual_id,origin, newcell) %>%
+  tally() %>% mutate(cell_percentage= n*100/sum(n)) 
+head(tubo_bar_Stat)
+
+ggplot(tubo_bar_Stat, aes(newcell, cell_percentage, fill = newcell)) + geom_boxplot()
+
+T_cells <- dplyr::filter(tubo_bar_Stat, newcell == 'T_cells')
+ggplot(T_cells, aes(origin, cell_percentage, fill = origin)) + geom_boxplot()+
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = T) +
+  stat_compare_means(label.y = 100) + theme_bw()
+
+####### Boxplot
+
+ggplot(T_cells, aes(origin, cell_percentage, fill = origin)) + 
+  geom_boxplot(width = 0.2) +
+  geom_jitter(position = position_jitterdodge(0.1), alpha = 0.6, size = 3, color = "black") +  
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = function(p) {
+                if (p < 0.001) "***"
+                else if (p < 0.01) "**"
+                else if (p < 0.05) "*"
+                else "ns"
+              }) +
+  stat_compare_means(label = "p.format", label.y = c(140, 140, 154), vjust = -0.1) + 
+  theme_bw() +
+  labs(title = "T_cells distribution", 
+       x = "Conditions", 
+       y = "Cell Percentage") +
+  theme(axis.text = element_text(size = 14),     
+        axis.title = element_text(size = 16),    
+        plot.title = element_text(size = 18),    
+        legend.position = "none",               
+        panel.grid.major = element_blank(),     
+        panel.grid.minor = element_blank())     
+
+
+######## Proportion of NK_Cell 
+
+NK_cell <- dplyr::filter(tubo_bar_Stat, newcell == 'NK_cell')
+ggplot(NK_cell, aes(origin, cell_percentage, fill = origin)) + geom_boxplot()+
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = T) +
+  stat_compare_means(label.y = 100) + theme_bw()
+
+###### Boxplot
+
+ggplot(NK_cell, aes(origin, cell_percentage, fill = origin)) + 
+  geom_boxplot(width = 0.2) +
+  geom_jitter(position = position_jitterdodge(0.1), alpha = 0.6, size = 3, color = "black") +  
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = function(p) {
+                if (p < 0.001) "***"
+                else if (p < 0.01) "**"
+                else if (p < 0.05) "*"
+                else "ns"
+              }) +
+  stat_compare_means(label = "p.format", label.y = c(20, 140, 154), vjust = -0.1) + 
+  theme_bw() +
+  labs(title = "NK_cell distribution", 
+       x = "Conditions", 
+       y = "Cell Percentage") +
+  theme(axis.text = element_text(size = 14),     
+        axis.title = element_text(size = 16),    
+        plot.title = element_text(size = 18),    
+        legend.position = "none",               
+        panel.grid.major = element_blank(),     
+        panel.grid.minor = element_blank())     
+
+
+######### Calculate DC percentage
+
+tubo_bar_Stat<-Subset_cellsn@meta.data %>% group_by(individual_id,origin, newcell) %>%
+  tally() %>% mutate(cell_percentage= n*100/sum(n)) 
+head(tubo_bar_Stat)
+
+ggplot(tubo_bar_Stat, aes(newcell, cell_percentage, fill = newcell)) + geom_boxplot()
+
+DC <- dplyr::filter(tubo_bar_Stat, newcell == 'DC')
+ggplot(DC, aes(origin, cell_percentage, fill = origin)) + geom_boxplot()
+
+my_comp <- list(c('Moderate', 'Control'),
+                c('Moderate', 'SevereA'),
+                c('SevereA', 'Control'),
+                c('SevereD', 'Control'),
+                c('Moderate', 'SevereD'),
+                c('SevereA', 'SevereD'))
+
+DC <- dplyr::filter(tubo_bar_Stat, newcell == 'DC')
+ggplot(DC, aes(origin, cell_percentage, fill = origin)) + geom_boxplot()+
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = T) +
+  stat_compare_means(label.y = 100) + theme_bw()
+
+ggplot(DC, aes(origin, cell_percentage, fill = origin)) + 
+  geom_boxplot(width = 0.2) +
+  geom_jitter(position = position_jitterdodge(0.1), alpha = 0.6, size = 3, color = "black") +  
+  geom_signif(comparisons = my_comp, test = "wilcox.test", textsize = 4, 
+              step_increase = 0.1, map_signif_level = function(p) {
+                if (p < 0.001) "***"
+                else if (p < 0.01) "**"
+                else if (p < 0.05) "*"
+                else "ns"
+              }) +
+  stat_compare_means(label = "p.format", label.y = c(20, 140, 154), vjust = -0.1) + 
+  theme_bw() +
+  labs(title = "DC distribution", 
+       x = "Conditions", 
+       y = "Cell Percentage") +
+  theme(axis.text = element_text(size = 14),     
+        axis.title = element_text(size = 16),    
+        plot.title = element_text(size = 18),    
+        legend.position = "none",               
+        panel.grid.major = element_blank(),     
+        panel.grid.minor = element_blank())    
+
+
+
+############ Exporting percentages
+
+write.csv(DC, file = "DC.csv", row.names = TRUE)
+
+##### Dotplots per cell and per condition
+
+Genestoplot_Neutrohpils <- c("CXCL2","CCL2", "ITGAM","ICAM1","ITGB3","CXCR2","SYK", "CXCL3", "FCGR3B", "CLEC4E","S100A9",
+                             "IL1RN","CXCL10","TREM1", "IL1B","CD274", "CXCR1",
+                             "MRC1", "S100A8", "HIF1A", "TMEM173","CXCR4","CCL4","HIST1H2AC", "CASP3","NFE2L2", "SELL",
+                            "BAX","GSDMD","CXCL8","AIM2","NLRP3","NFKB1", "MCL1","CEBPD", "CEBPZ", "TLR2", "TLR4")
+
+Genestoplot_macrophages <- c("CCL2","SIGLEC1", "TREX1", "TREX2", "CCL3", "TNF", "CXCL10", "TREM2", "APOC1", "NRP1", 
+                             "VEGFA", "TIMP1", "TGFB1", "MARCO", "IL1B", "CD274", "FABP4", "MAFB",   
+                             "IL6", "MRC1", "SPP1", "HIF1A", "AKT1", "SERPINA1", "CD80", "BAX",     
+                             "GSDMD", "CXCL8", "AIM2", "NLRP3", "NFKB1", "MSR1", "JUN", "NFE2L2", "MCL1",   
+                             "TLR2", "TLR4")
+
+Features_antiviral_NK <- c("NKG7","CD8A", "KLRD1", "STAT1", "STAT2","CXCL8","TNFAIP3", "CD274", "MCL1", "BAX", "PRF1", "IL1B", "GSDMD","LAG3","NFE2L2",
+             "IFNGR1","IFNAR1","IFNLR1","GBP1", "GBP4", "IFITM3", "CTLA4", "NLRP3", "PYCARD", "IL10","TGFB1","SERPINB9","IKZF2", "RORC", "GITR",
+         "ISG15", "WARS", "MX1", "MX2", "IFI16", "ISG20","IFNG","IFNA1","IFNL1", "IFNB1","SYK", "GZMB","GZMA", "FASLG","SOCS3", "DUSP1",
+              "IFIT1", "IFIT2", "IFIT3", "IFIT5", "IFI6","FOS","JUN", "ATF3", "IFI44", "OAS1", "OAS2", "OAS3", "TIGIT")
+
+
+DCs <- c("HLA-A","HLA-B","HLA-C", "IRF7", "CD80","CD86", "CD83", "CD209", "CCR7", "TLR7")
+
+DotPlot(Subset_cellsMn, features = Genestoplot_macrophages, group.by = "origin") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12),  
+        axis.text.y = element_text(size = 20),  # Increase size of y-axis labels
+        axis.title = element_blank(),  # Remove axis titles
+        plot.title = element_text(hjust = 0.5, size = 25, face = "bold"),  
+        legend.position = "right", 
+        legend.margin = margin(5, 10, -20, -5)) +  
+  ggtitle("Mono_Mac")  # Set plot title
+
+
+##### Dotplot for main antiviral genes/receptors
+
+Features_antiviralT <- c("CD4", "CD8A", "TBX21", "STAT1", "STAT2", "CD274", "MCL1", "BAX", "PRF1", "IL1B", "GSDMD","LAG3","NFE2L2",
+                        "IFNGR1","IFNAR1","IFNLR1","GBP1", "GBP4", "IFITM3", "CTLA4", "NLRP3", "PYCARD", "TGFB1","SERPINB9",
+                        "ISG15", "WARS", "MX1", "MX2", "IFI16", "ISG20","IFNG","IFNA1","IFNL1", "IFNB1","GZMB","GZMA", "FASLG",
+                        "IFIT1", "IFIT2", "IFIT3", "IFIT5", "IFI6","FOS","JUN", "ATF3", "IFI44", "OAS1", "OAS2", "OAS3")
+
+
+Subset_cells$cell_origin <- paste0(Subset_cells$newcell, '_', Subset_cells$origin)
+
+DotPlot(Subset_cellsT, features = Features_antiviralT, group.by = "origin") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12),  
+        axis.text.y = element_text(size = 20),  
+        axis.title = element_blank(),  
+        plot.title = element_text(hjust = 0.5, size = 25, face = "bold"),  
+        legend.position = "right", 
+        legend.margin = margin(5, 10, -20, -5)) +  
+  ggtitle("T_Cells")  
+
